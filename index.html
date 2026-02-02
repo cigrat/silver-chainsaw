@@ -32,14 +32,11 @@
         .search-box { display: flex; gap: 5px; width: 100%; }
         .search-box input { flex-grow: 1; }
 
-        /* Original Column Layout Logic */
         #gallery { width: 100%; display: flex; align-items: flex-start; gap: 0; padding: 0; }
         .v-column { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 0; }
         .post-container { line-height: 0; background: #000; position: relative; }
         img, video { width: 100%; height: auto; display: block; border: none; }
 
-        /* Autocomplete */
-        .search-container { position: relative; width: 100%; }
         #autocomplete-list {
             position: absolute; top: 100%; left: 0; right: 0;
             background: #222; z-index: 1001; max-height: 200px; overflow-y: auto;
@@ -48,7 +45,6 @@
         .autocomplete-item { padding: 12px; border-bottom: 1px solid #333; font-size: 14px; }
         .val-label { min-width: 45px; font-weight: bold; font-family: monospace; }
 
-        /* Modal / Action Sheet Styles */
         #modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;
@@ -69,7 +65,6 @@
         .sheet-btn:active { background: #3a3a3c; }
         .sheet-cancel { font-weight: 600; color: #ff453a; border-bottom: none; margin-top: 8px; border-top: 8px solid #000; }
         .pool-text { color: var(--accent); }
-
     </style>
 </head>
 <body>
@@ -101,7 +96,10 @@
                 <select id="sortSelect" style="flex:1">
                     <option value="order:id_desc">Newest</option>
                     <option value="order:score">Top Score</option>
+                    <option value="order:favcount">Favorites</option>
                     <option value="order:random">Random</option>
+                    <option value="order:updated">Updated</option>
+                    <option value="order:id_asc">Oldest</option>
                 </select>
             </div>
 
@@ -162,19 +160,15 @@
         const sheetActions = document.getElementById('sheet-actions');
 
         function toggleMenu() { wrapper.classList.toggle('open'); }
-        
         function closeModal(e) { 
             if(!e || e.target === modalOverlay || e.target.classList.contains('sheet-cancel')) {
                 modalOverlay.style.display = 'none'; 
             }
         }
 
-        // Check URL for tags (allows sharing/new tabs)
         function checkUrlParams() {
             const params = new URLSearchParams(window.location.search);
-            if (params.has('tags')) {
-                searchInput.value = params.get('tags');
-            }
+            if (params.has('tags')) searchInput.value = params.get('tags');
         }
 
         function getMappedScore(val) {
@@ -205,7 +199,6 @@
                 postCounter = 0;
                 hasMore = true;
                 setupColumns();
-                // Update URL for history
                 const newUrl = window.location.pathname + '?tags=' + encodeURIComponent(searchInput.value);
                 window.history.replaceState(null, '', newUrl);
             }
@@ -239,19 +232,11 @@
 
             posts.forEach(post => {
                 if (!post.file || !post.file.url) return;
-                
                 const div = document.createElement('div');
                 div.className = 'post-container';
-                
-                // Div instead of A tag to control click event manually
                 const container = document.createElement('div');
                 container.style.cursor = "pointer";
-                
-                // Click Handler -> Open Menu
-                container.onclick = (e) => {
-                    e.preventDefault();
-                    openOptions(post);
-                };
+                container.onclick = (e) => { e.preventDefault(); openOptions(post); };
 
                 const colIndex = postCounter % cols.length;
                 cols[colIndex].appendChild(div);
@@ -260,22 +245,17 @@
 
                 let media;
                 const isVideo = post.file.ext === 'webm';
-
                 if (resType === 'preview') {
                     media = document.createElement('img');
                     media.src = post.preview.url;
                 } else if (isVideo) {
                     media = document.createElement('video');
                     media.src = post.file.url;
-                    media.autoplay = true;
-                    media.loop = true;
-                    media.muted = true;
-                    media.playsInline = true;
+                    media.autoplay = true; media.loop = true; media.muted = true; media.playsInline = true;
                 } else {
                     media = document.createElement('img');
                     media.src = (resType === 'sample' && post.sample.has) ? post.sample.url : post.file.url;
                 }
-                
                 media.loading = "lazy";
                 container.appendChild(media);
             });
@@ -283,22 +263,16 @@
 
         function openOptions(post) {
             sheetActions.innerHTML = '';
-
-            // 1. Direct Image
             const btnImg = document.createElement('button');
-            btnImg.className = 'sheet-btn';
-            btnImg.innerText = 'Open Image';
+            btnImg.className = 'sheet-btn'; btnImg.innerText = 'Open Image';
             btnImg.onclick = () => { window.open(post.file.url, '_blank'); closeModal(); };
             sheetActions.appendChild(btnImg);
 
-            // 2. E621 Page
             const btnPage = document.createElement('button');
-            btnPage.className = 'sheet-btn';
-            btnPage.innerText = 'Open Post Page';
+            btnPage.className = 'sheet-btn'; btnPage.innerText = 'Open Post Page';
             btnPage.onclick = () => { window.open(`https://e621.net/posts/${post.id}`, '_blank'); closeModal(); };
             sheetActions.appendChild(btnPage);
 
-            // 3. Pools
             if (post.pools && post.pools.length > 0) {
                 post.pools.forEach(poolId => {
                     const btnPool = document.createElement('button');
@@ -306,21 +280,17 @@
                     btnPool.innerText = `Open Pool #${poolId}`;
                     btnPool.onclick = () => {
                         const currentUrl = window.location.href.split('?')[0];
-                        // Open NEW tab of THIS app with pool search
                         window.open(`${currentUrl}?tags=pool:${poolId}`, '_blank');
                         closeModal();
                     };
                     sheetActions.appendChild(btnPool);
                 });
             }
-
             modalOverlay.style.display = 'flex';
         }
 
-        // Init
         sizeSlider.addEventListener('input', () => { document.getElementById('sizeVal').innerText = sizeSlider.value; });
         sizeSlider.addEventListener('change', () => { postCounter = 0; setupColumns(); renderPosts(currentPosts); });
-        
         scoreSlider.addEventListener('input', () => { document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value) + "+"; });
         
         document.getElementById('searchBtn').onclick = () => { loadPosts(true); toggleMenu(); };
@@ -329,13 +299,10 @@
         });
 
         window.addEventListener('scroll', () => {
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1200) {
-                loadPosts();
-            }
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1200) loadPosts();
         });
 
         checkUrlParams();
-        document.documentElement.style.setProperty('--cols', sizeSlider.value);
         setupColumns();
         loadPosts(true);
     </script>
