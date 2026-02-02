@@ -6,13 +6,23 @@
     <title>Zodiac Mobile</title>
     <style>
         :root { --bg: #000; --panel: #1a1a1a; --border: #333; --text: #eee; --accent: #007aff; }
-        body { margin: 0; background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); padding-top: 60px; -webkit-user-select: none; user-select: none; }
         
-        /* --- Header & Controls --- */
+        /* iOS Specific Polish */
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            margin: 0; background-color: var(--bg); 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            color: var(--text); padding-top: 60px; 
+            
+            /* Disables text selection to prevent accidental highlighting */
+            -webkit-user-select: none; user-select: none; 
+        }
+        
         header {
             position: fixed; top: 0; width: 100%; z-index: 1000;
             background: rgba(10, 10, 10, 0.95); border-bottom: 1px solid #222;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         }
         .header-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; height: 40px; }
         .menu-toggle { background: #333; border: none; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 14px; cursor: pointer; }
@@ -33,32 +43,40 @@
         .search-box { display: flex; gap: 5px; width: 100%; }
         .search-box input { flex-grow: 1; }
 
-        /* --- Masonry Gallery --- */
         #gallery { width: 100%; display: flex; align-items: flex-start; gap: 0; padding: 0; }
         .v-column { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 0; }
         .post-container { line-height: 0; background: #000; position: relative; }
-        img, video { width: 100%; height: auto; display: block; border: none; touch-action: pan-y; }
+        
+        /* IMPORTANT: This disables the native iOS long-press menu on images */
+        img, video { 
+            width: 100%; height: auto; display: block; border: none; 
+            -webkit-touch-callout: none; 
+            touch-action: pan-y;
+        }
 
-        /* --- Long Press Modal --- */
+        /* Modal Styles */
         #lp-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
         }
         #lp-menu {
-            background: #1a1a1a; width: 80%; max-width: 300px; border-radius: 12px;
-            overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333;
+            background: #1c1c1e; width: 85%; max-width: 320px; border-radius: 14px;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.7); 
+            border: 1px solid #333; animation: popIn 0.2s ease-out;
         }
-        .lp-header { padding: 15px; background: #222; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .lp-header { padding: 16px; background: #2c2c2e; text-align: center; font-weight: 600; border-bottom: 1px solid #3a3a3c; color: #fff; }
         .lp-btn {
-            display: block; width: 100%; padding: 15px; background: transparent; border: none;
-            border-bottom: 1px solid #2a2a2a; color: #fff; font-size: 16px; text-align: left; cursor: pointer;
+            display: block; width: 100%; padding: 16px; background: transparent; border: none;
+            border-bottom: 1px solid #2c2c2e; color: #fff; font-size: 17px; text-align: center; cursor: pointer;
         }
-        .lp-btn:last-child { border-bottom: none; }
-        .lp-btn:active { background: #333; }
-        .lp-cancel { background: #111; color: #888; text-align: center; }
-        .pool-btn { color: var(--accent); }
+        .lp-btn:active { background: #3a3a3c; }
+        .lp-cancel { font-weight: 600; color: #ff453a; border-bottom: none; margin-top: 8px; border-top: 8px solid #000; }
+        .pool-btn { color: #0a84ff; }
 
-        /* --- Utils --- */
+        /* Utils */
         #autocomplete-list {
             position: absolute; top: 100%; left: 0; right: 0;
             background: #222; z-index: 1001; max-height: 200px; overflow-y: auto;
@@ -136,7 +154,7 @@
 
     <div id="lp-modal" onclick="closeModal(event)">
         <div id="lp-menu">
-            <div class="lp-header">Post Options</div>
+            <div class="lp-header">Options</div>
             <div id="lp-actions"></div>
             <button class="lp-btn lp-cancel" onclick="closeModal(null)">Cancel</button>
         </div>
@@ -159,10 +177,9 @@
 
         function toggleMenu() { wrapper.classList.toggle('open'); }
         function closeModal(e) { 
-            if(!e || e.target === lpModal) lpModal.style.display = 'none'; 
+            if(!e || e.target === lpModal || e.target.classList.contains('lp-cancel')) lpModal.style.display = 'none'; 
         }
 
-        // --- URL Param Handling ---
         function checkUrlParams() {
             const params = new URLSearchParams(window.location.search);
             if (params.has('tags')) {
@@ -198,7 +215,6 @@
                 postCounter = 0;
                 hasMore = true;
                 setupColumns();
-                // Update URL for bookmarking current search if manual search
                 const newUrl = window.location.pathname + '?tags=' + encodeURIComponent(searchInput.value);
                 window.history.replaceState(null, '', newUrl);
             }
@@ -238,24 +254,24 @@
                 const a = document.createElement('a');
                 a.href = post.file.url;
                 
-                // --- Long Press Logic ---
+                // --- iOS Optimized Long Press ---
                 let timer;
-                const startPress = (e) => {
+                const startPress = () => {
                     timer = setTimeout(() => {
                         showLongPressMenu(post);
                     }, 500); 
                 };
                 const cancelPress = () => clearTimeout(timer);
 
-                // Prevent context menu on long press
-                a.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+                // Disable native context menu (Critical for iOS)
+                a.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); }, false);
                 
-                // Touch events
+                // Touch Listeners
                 a.addEventListener('touchstart', startPress, {passive: true});
                 a.addEventListener('touchend', cancelPress);
-                a.addEventListener('touchmove', cancelPress);
+                a.addEventListener('touchcancel', cancelPress); // Handle interruptions
+                a.addEventListener('touchmove', cancelPress); // Cancel if scrolling
                 
-                // Normal click behavior (navigate)
                 a.onclick = (e) => {
                     e.preventDefault();
                     window.open(post.file.url, '_blank');
@@ -292,41 +308,36 @@
         function showLongPressMenu(post) {
             lpActions.innerHTML = '';
 
-            // 1. Go to E621 Page
             const btnPage = document.createElement('button');
             btnPage.className = 'lp-btn';
-            btnPage.innerText = 'Open E621 Page';
-            btnPage.onclick = () => window.open(`https://e621.net/posts/${post.id}`, '_blank');
+            btnPage.innerText = 'Go to E621 Page';
+            btnPage.onclick = () => { window.open(`https://e621.net/posts/${post.id}`, '_blank'); closeModal(); };
             lpActions.appendChild(btnPage);
 
-            // 2. Open Direct Image
             const btnImg = document.createElement('button');
             btnImg.className = 'lp-btn';
-            btnImg.innerText = 'Open Direct Image';
-            btnImg.onclick = () => window.open(post.file.url, '_blank');
+            btnImg.innerText = 'Direct Image Link';
+            btnImg.onclick = () => { window.open(post.file.url, '_blank'); closeModal(); };
             lpActions.appendChild(btnImg);
 
-            // 3. Pool Options
             if (post.pools && post.pools.length > 0) {
                 post.pools.forEach(poolId => {
                     const btnPool = document.createElement('button');
                     btnPool.className = 'lp-btn pool-btn';
-                    btnPool.innerText = `Search Pool #${poolId}`;
+                    btnPool.innerText = `Open Pool #${poolId}`;
                     btnPool.onclick = () => {
                         const currentUrl = window.location.href.split('?')[0];
                         window.open(`${currentUrl}?tags=pool:${poolId}`, '_blank');
+                        closeModal();
                     };
                     lpActions.appendChild(btnPool);
                 });
             }
 
             lpModal.style.display = 'flex';
-            
-            // Vibrate if supported
             if (navigator.vibrate) navigator.vibrate(50);
         }
 
-        // --- Init ---
         sizeSlider.addEventListener('input', () => { document.getElementById('sizeVal').innerText = sizeSlider.value; });
         sizeSlider.addEventListener('change', () => { postCounter = 0; setupColumns(); renderPosts(currentPosts); });
         scoreSlider.addEventListener('input', () => { document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value) + "+"; });
@@ -342,9 +353,9 @@
             }
         });
 
-        checkUrlParams(); // Check for ?tags=pool:123
+        checkUrlParams();
         document.documentElement.style.setProperty('--cols', sizeSlider.value);
-        setupColumns(); // Ensure columns exist before loading
+        setupColumns();
         loadPosts(true);
     </script>
 </body>
