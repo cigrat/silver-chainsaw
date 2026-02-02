@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zodiac Mobile</title>
+    <style>
+        :root { --bg: #000; --panel: #1a1a1a; --border: #333; --text: #eee; }
+        body { margin: 0; background-color: var(--bg); font-family: sans-serif; color: var(--text); padding-top: 60px; }
+        
+        header {
+            position: fixed; top: 0; width: 100%; z-index: 1000;
+            background: rgba(10, 10, 10, 0.95); border-bottom: 1px solid #222;
+            backdrop-filter: blur(10px);
+        }
+        .header-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; height: 40px; }
+        .menu-toggle { background: #333; border: none; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+        
+        #controls-wrapper { 
+            display: none; padding: 15px; background: var(--panel); 
+            max-height: 80vh; overflow-y: auto; border-bottom: 1px solid var(--border);
+        }
+        #controls-wrapper.open { display: block; }
+
+        .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .control-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        
+        input[type="text"], select, button {
+            background: #222; border: 1px solid var(--border); color: #fff;
+            padding: 10px; border-radius: 6px; font-size: 16px;
+        }
+        .search-box { display: flex; gap: 5px; width: 100%; }
+        .search-box input { flex-grow: 1; }
+
+        /* Original Column Layout Logic */
+        #gallery { width: 100%; display: flex; align-items: flex-start; gap: 0; padding: 0; }
+        .v-column { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 0; }
+        .post-container { line-height: 0; background: #000; position: relative; }
+        img, video { width: 100%; height: auto; display: block; border: none; }
+
+        /* Autocomplete */
+        .search-container { position: relative; width: 100%; }
+        #autocomplete-list {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: #222; z-index: 1001; max-height: 200px; overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+        .autocomplete-item { padding: 12px; border-bottom: 1px solid #333; font-size: 14px; }
+
+        .val-label { min-width: 45px; font-weight: bold; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-top">
+            <div style="font-weight: bold; letter-spacing: 1px;">ZODIAC</div>
+            <button class="menu-toggle" onclick="toggleMenu()">Filters</button>
+        </div>
+        
+        <div id="controls-wrapper">
+            <div class="control-group">
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchBar" placeholder="Search tags..." autocomplete="off">
+                        <button id="searchBtn">Go</button>
+                    </div>
+                    <div id="autocomplete-list"></div>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <select id="ratingSelect" style="flex:1">
+                    <option value="">Any Rating</option>
+                    <option value="rating:s">Safe</option>
+                    <option value="rating:q">Questionable</option>
+                    <option value="rating:e">Explicit</option>
+                </select>
+                <select id="sortSelect" style="flex:1">
+                    <option value="order:id_desc">Newest</option>
+                    <option value="order:score">Top Score</option>
+                    <option value="order:random">Random</option>
+                </select>
+            </div>
+
+            <div class="control-group" style="margin-top:15px;">
+                <div class="control-row">
+                    <span>Score:</span>
+                    <input type="range" id="scoreSlider" min="0" max="100" step="1" value="0">
+                    <span id="scoreVal" class="val-label">0+</span>
+                </div>
+                <div class="control-row">
+                    <span>Cols:</span>
+                    <input type="range" id="sizeSlider" min="1" max="6" step="1" value="2">
+                    <span id="sizeVal" class="val-label">2</span>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <select id="typeSelect" style="flex:1">
+                    <option value="">All Types</option>
+                    <option value="-type:webm">Static</option>
+                    <option value="type:webm">Video</option>
+                </select>
+                <select id="resSelect" style="flex:1">
+                    <option value="preview">Thumb</option>
+                    <option value="sample" selected>Scaled</option>
+                    <option value="file">Full</option>
+                </select>
+            </div>
+            <button onclick="toggleMenu()" style="width: 100%; margin-top: 15px; background: #444;">Apply & Close</button>
+        </div>
+    </header>
+
+    <div id="gallery"></div>
+    <div id="status" style="text-align:center; padding: 20px; color: #666; font-size: 14px;"></div>
+    <div id="sentinel" style="height: 20px;"></div>
+
+    <script>
+        let currentPage = 1;
+        let isFetching = false;
+        let hasMore = true;
+        let currentPosts = [];
+        let postCounter = 0;
+
+        const gallery = document.getElementById('gallery');
+        const searchInput = document.getElementById('searchBar');
+        const scoreSlider = document.getElementById('scoreSlider');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const wrapper = document.getElementById('controls-wrapper');
+
+        function toggleMenu() { wrapper.classList.toggle('open'); }
+
+        function getMappedScore(val) {
+            val = parseInt(val);
+            if (val <= 50) return val * 2;
+            if (val <= 80) return 100 + (val - 50) * 10;
+            return 400 + (val - 80) * 80;
+        }
+
+        function setupColumns() {
+            gallery.innerHTML = '';
+            const colsCount = parseInt(sizeSlider.value);
+            for (let i = 0; i < colsCount; i++) {
+                const col = document.createElement('div');
+                col.className = 'v-column';
+                gallery.appendChild(col);
+            }
+        }
+
+        async function loadPosts(reset = false) {
+            if (isFetching || (!hasMore && !reset)) return;
+            isFetching = true;
+            document.getElementById('status').innerText = "Loading...";
+            
+            if (reset) {
+                currentPage = 1;
+                currentPosts = [];
+                postCounter = 0;
+                hasMore = true;
+                setupColumns();
+            }
+
+            const score = getMappedScore(scoreSlider.value);
+            const tags = `${searchInput.value} ${document.getElementById('ratingSelect').value} ${document.getElementById('sortSelect').value} ${score > 0 ? 'score:>=' + score : ''} ${document.getElementById('typeSelect').value}`.trim();
+            const url = `https://e621.net/posts.json?tags=${encodeURIComponent(tags)}&page=${currentPage}&limit=40`;
+
+            try {
+                const response = await fetch(url, { headers: { 'User-Agent': 'ZodiacMobile/1.0' } });
+                const data = await response.json();
+                
+                if (!data.posts || data.posts.length === 0) {
+                    hasMore = false;
+                    document.getElementById('status').innerText = "End of results.";
+                } else {
+                    currentPosts = reset ? data.posts : [...currentPosts, ...data.posts];
+                    renderPosts(data.posts);
+                    currentPage++;
+                    document.getElementById('status').innerText = "";
+                }
+            } catch (err) {
+                document.getElementById('status').innerText = "Fetch error.";
+            } finally { isFetching = false; }
+        }
+
+        function renderPosts(posts) {
+            const resType = document.getElementById('resSelect').value;
+            const cols = gallery.getElementsByClassName('v-column');
+            if (cols.length === 0) return;
+
+            posts.forEach(post => {
+                if (!post.file || !post.file.url) return;
+                
+                const div = document.createElement('div');
+                div.className = 'post-container';
+                const a = document.createElement('a');
+                a.href = post.file.url;
+                a.target = '_blank';
+
+                const colIndex = postCounter % cols.length;
+                cols[colIndex].appendChild(div);
+                div.appendChild(a);
+                postCounter++;
+
+                let media;
+                const isVideo = post.file.ext === 'webm';
+
+                if (resType === 'preview') {
+                    media = document.createElement('img');
+                    media.src = post.preview.url;
+                } else if (isVideo) {
+                    media = document.createElement('video');
+                    media.src = post.file.url;
+                    media.autoplay = true;
+                    media.loop = true;
+                    media.muted = true;
+                    media.playsInline = true;
+                } else {
+                    media = document.createElement('img');
+                    media.src = (resType === 'sample' && post.sample.has) ? post.sample.url : post.file.url;
+                }
+                
+                media.loading = "lazy";
+                a.appendChild(media);
+            });
+        }
+
+        // Event Listeners
+        sizeSlider.addEventListener('input', () => { document.getElementById('sizeVal').innerText = sizeSlider.value; });
+        sizeSlider.addEventListener('change', () => { postCounter = 0; setupColumns(); renderPosts(currentPosts); });
+        
+        scoreSlider.addEventListener('input', () => { document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value) + "+"; });
+        
+        document.getElementById('searchBtn').onclick = () => loadPosts(true);
+        [scoreSlider, document.getElementById('ratingSelect'), document.getElementById('sortSelect'), document.getElementById('typeSelect'), document.getElementById('resSelect')].forEach(el => {
+            el.addEventListener('change', () => loadPosts(true));
+        });
+
+        window.addEventListener('scroll', () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1200) {
+                loadPosts();
+            }
+        });
+
+        loadPosts(true);
+    </script>
+</body>
+</html>
