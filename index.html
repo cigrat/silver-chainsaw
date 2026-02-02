@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zodiac Mobile</title>
     <style>
-        :root { --bg: #000; --panel: #1a1a1a; --border: #333; --text: #eee; }
-        body { margin: 0; background-color: var(--bg); font-family: sans-serif; color: var(--text); padding-top: 60px; }
+        :root { --bg: #000; --panel: #1a1a1a; --border: #333; --text: #eee; --accent: #007aff; }
+        body { margin: 0; background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); padding-top: 60px; -webkit-user-select: none; user-select: none; }
         
+        /* --- Header & Controls --- */
         header {
             position: fixed; top: 0; width: 100%; z-index: 1000;
             background: rgba(10, 10, 10, 0.95); border-bottom: 1px solid #222;
@@ -27,26 +28,43 @@
         
         input[type="text"], select, button {
             background: #222; border: 1px solid var(--border); color: #fff;
-            padding: 10px; border-radius: 6px; font-size: 16px;
+            padding: 10px; border-radius: 6px; font-size: 16px; outline: none;
         }
         .search-box { display: flex; gap: 5px; width: 100%; }
         .search-box input { flex-grow: 1; }
 
-        /* Original Column Layout Logic */
+        /* --- Masonry Gallery --- */
         #gallery { width: 100%; display: flex; align-items: flex-start; gap: 0; padding: 0; }
         .v-column { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 0; }
         .post-container { line-height: 0; background: #000; position: relative; }
-        img, video { width: 100%; height: auto; display: block; border: none; }
+        img, video { width: 100%; height: auto; display: block; border: none; touch-action: pan-y; }
 
-        /* Autocomplete */
-        .search-container { position: relative; width: 100%; }
+        /* --- Long Press Modal --- */
+        #lp-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;
+        }
+        #lp-menu {
+            background: #1a1a1a; width: 80%; max-width: 300px; border-radius: 12px;
+            overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333;
+        }
+        .lp-header { padding: 15px; background: #222; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
+        .lp-btn {
+            display: block; width: 100%; padding: 15px; background: transparent; border: none;
+            border-bottom: 1px solid #2a2a2a; color: #fff; font-size: 16px; text-align: left; cursor: pointer;
+        }
+        .lp-btn:last-child { border-bottom: none; }
+        .lp-btn:active { background: #333; }
+        .lp-cancel { background: #111; color: #888; text-align: center; }
+        .pool-btn { color: var(--accent); }
+
+        /* --- Utils --- */
         #autocomplete-list {
             position: absolute; top: 100%; left: 0; right: 0;
             background: #222; z-index: 1001; max-height: 200px; overflow-y: auto;
             border: 1px solid var(--border);
         }
         .autocomplete-item { padding: 12px; border-bottom: 1px solid #333; font-size: 14px; }
-
         .val-label { min-width: 45px; font-weight: bold; font-family: monospace; }
     </style>
 </head>
@@ -54,7 +72,7 @@
 
     <header>
         <div class="header-top">
-            <div style="font-weight: bold; letter-spacing: 1px;">ZODIAC</div>
+            <div style="font-weight: bold; letter-spacing: 1px;" onclick="window.scrollTo(0,0)">ZODIAC</div>
             <button class="menu-toggle" onclick="toggleMenu()">Filters</button>
         </div>
         
@@ -114,7 +132,15 @@
 
     <div id="gallery"></div>
     <div id="status" style="text-align:center; padding: 20px; color: #666; font-size: 14px;"></div>
-    <div id="sentinel" style="height: 20px;"></div>
+    <div id="sentinel" style="height: 50px;"></div>
+
+    <div id="lp-modal" onclick="closeModal(event)">
+        <div id="lp-menu">
+            <div class="lp-header">Post Options</div>
+            <div id="lp-actions"></div>
+            <button class="lp-btn lp-cancel" onclick="closeModal(null)">Cancel</button>
+        </div>
+    </div>
 
     <script>
         let currentPage = 1;
@@ -128,8 +154,21 @@
         const scoreSlider = document.getElementById('scoreSlider');
         const sizeSlider = document.getElementById('sizeSlider');
         const wrapper = document.getElementById('controls-wrapper');
+        const lpModal = document.getElementById('lp-modal');
+        const lpActions = document.getElementById('lp-actions');
 
         function toggleMenu() { wrapper.classList.toggle('open'); }
+        function closeModal(e) { 
+            if(!e || e.target === lpModal) lpModal.style.display = 'none'; 
+        }
+
+        // --- URL Param Handling ---
+        function checkUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('tags')) {
+                searchInput.value = params.get('tags');
+            }
+        }
 
         function getMappedScore(val) {
             val = parseInt(val);
@@ -159,11 +198,14 @@
                 postCounter = 0;
                 hasMore = true;
                 setupColumns();
+                // Update URL for bookmarking current search if manual search
+                const newUrl = window.location.pathname + '?tags=' + encodeURIComponent(searchInput.value);
+                window.history.replaceState(null, '', newUrl);
             }
 
             const score = getMappedScore(scoreSlider.value);
             const tags = `${searchInput.value} ${document.getElementById('ratingSelect').value} ${document.getElementById('sortSelect').value} ${score > 0 ? 'score:>=' + score : ''} ${document.getElementById('typeSelect').value}`.trim();
-            const url = `https://e621.net/posts.json?tags=${encodeURIComponent(tags)}&page=${currentPage}&limit=40`;
+            const url = `https://e621.net/posts.json?tags=${encodeURIComponent(tags)}&page=${currentPage}&limit=30`;
 
             try {
                 const response = await fetch(url, { headers: { 'User-Agent': 'ZodiacMobile/1.0' } });
@@ -195,7 +237,29 @@
                 div.className = 'post-container';
                 const a = document.createElement('a');
                 a.href = post.file.url;
-                a.target = '_blank';
+                
+                // --- Long Press Logic ---
+                let timer;
+                const startPress = (e) => {
+                    timer = setTimeout(() => {
+                        showLongPressMenu(post);
+                    }, 500); 
+                };
+                const cancelPress = () => clearTimeout(timer);
+
+                // Prevent context menu on long press
+                a.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+                
+                // Touch events
+                a.addEventListener('touchstart', startPress, {passive: true});
+                a.addEventListener('touchend', cancelPress);
+                a.addEventListener('touchmove', cancelPress);
+                
+                // Normal click behavior (navigate)
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    window.open(post.file.url, '_blank');
+                };
 
                 const colIndex = postCounter % cols.length;
                 cols[colIndex].appendChild(div);
@@ -225,23 +289,62 @@
             });
         }
 
-        // Event Listeners
+        function showLongPressMenu(post) {
+            lpActions.innerHTML = '';
+
+            // 1. Go to E621 Page
+            const btnPage = document.createElement('button');
+            btnPage.className = 'lp-btn';
+            btnPage.innerText = 'Open E621 Page';
+            btnPage.onclick = () => window.open(`https://e621.net/posts/${post.id}`, '_blank');
+            lpActions.appendChild(btnPage);
+
+            // 2. Open Direct Image
+            const btnImg = document.createElement('button');
+            btnImg.className = 'lp-btn';
+            btnImg.innerText = 'Open Direct Image';
+            btnImg.onclick = () => window.open(post.file.url, '_blank');
+            lpActions.appendChild(btnImg);
+
+            // 3. Pool Options
+            if (post.pools && post.pools.length > 0) {
+                post.pools.forEach(poolId => {
+                    const btnPool = document.createElement('button');
+                    btnPool.className = 'lp-btn pool-btn';
+                    btnPool.innerText = `Search Pool #${poolId}`;
+                    btnPool.onclick = () => {
+                        const currentUrl = window.location.href.split('?')[0];
+                        window.open(`${currentUrl}?tags=pool:${poolId}`, '_blank');
+                    };
+                    lpActions.appendChild(btnPool);
+                });
+            }
+
+            lpModal.style.display = 'flex';
+            
+            // Vibrate if supported
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+
+        // --- Init ---
         sizeSlider.addEventListener('input', () => { document.getElementById('sizeVal').innerText = sizeSlider.value; });
         sizeSlider.addEventListener('change', () => { postCounter = 0; setupColumns(); renderPosts(currentPosts); });
-        
         scoreSlider.addEventListener('input', () => { document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value) + "+"; });
         
-        document.getElementById('searchBtn').onclick = () => loadPosts(true);
+        document.getElementById('searchBtn').onclick = () => { loadPosts(true); toggleMenu(); };
         [scoreSlider, document.getElementById('ratingSelect'), document.getElementById('sortSelect'), document.getElementById('typeSelect'), document.getElementById('resSelect')].forEach(el => {
             el.addEventListener('change', () => loadPosts(true));
         });
 
         window.addEventListener('scroll', () => {
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1200) {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1500) {
                 loadPosts();
             }
         });
 
+        checkUrlParams(); // Check for ?tags=pool:123
+        document.documentElement.style.setProperty('--cols', sizeSlider.value);
+        setupColumns(); // Ensure columns exist before loading
         loadPosts(true);
     </script>
 </body>
