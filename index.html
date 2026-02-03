@@ -3,172 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zodiac Mobile</title>
+    <title>GRID</title>
     <style>
         :root { --bg: #000; --panel: #1a1a1a; --border: #333; --text: #eee; --accent: #0a84ff; }
-        body { margin: 0; background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); padding-top: 60px; -webkit-tap-highlight-color: transparent; }
         
+        body { 
+            margin: 0; background-color: var(--bg); color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            padding-top: 65px; overflow-y: scroll; -webkit-tap-highlight-color: transparent;
+        }
+
         header {
             position: fixed; top: 0; width: 100%; z-index: 1000;
-            background: rgba(10, 10, 10, 0.95); border-bottom: 1px solid #222;
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            background: #000; border: none;
+            box-shadow: 0 1px 0 0 #222;
         }
-        .header-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; height: 40px; }
-        .menu-toggle { background: #333; border: none; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+
+        .header-container {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; height: 60px; gap: 12px;
+        }
+
+        .logo { font-weight: bold; cursor: pointer; font-size: 16px; color: #fff; white-space: nowrap; flex-shrink: 0; }
+
+        .search-outer {
+            display: flex; flex: 1; max-width: 500px; background: #1a1a1a; 
+            border-radius: 8px; border: 1px solid var(--border); overflow: hidden;
+        }
         
-        #controls-wrapper { 
-            display: none; padding: 15px; background: var(--panel); 
-            max-height: 80vh; overflow-y: auto; border-bottom: 1px solid var(--border);
+        input[type="text"] {
+            flex-grow: 1; background: transparent; border: none; color: #fff;
+            padding: 10px 12px; outline: none; font-size: 15px; width: 30px;
         }
-        #controls-wrapper.open { display: block; }
 
-        .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
-        .control-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        #searchBtn { 
+            background: var(--accent); color: #fff; border: none; 
+            padding: 0 15px; font-weight: 800; cursor: pointer;
+            border-left: 1px solid var(--border);
+        }
+
+        /* Fixed Button Alignment */
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .control-row { display: flex; gap: 8px; align-items: center; }
+
+        .drop-btn { 
+            background: #1a1a1a; border: 1px solid var(--border); color: #fff;
+            padding: 0 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+            white-space: nowrap; height: 34px; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center;
+        }
+
+        select.drop-btn { 
+            appearance: none; -webkit-appearance: none; 
+            text-align-last: center; 
+            padding-right: 10px; 
+        }
+
+        .slider-box {
+            display: flex; align-items: center; gap: 8px; background: #1a1a1a;
+            padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); 
+            height: 34px; box-sizing: border-box;
+        }
+        .slider-box span { font-size: 10px; color: #777; text-transform: uppercase; font-weight: 800; }
+        .slider-box b { 
+            font-family: monospace; font-size: 15px; color: var(--accent); 
+            width: 32px; text-align: center; display: flex; align-items: center;
+            justify-content: center; height: 100%; line-height: 1;
+        }
+        input[type="range"] { cursor: pointer; accent-color: var(--accent); width: 70px; }
+
+        .custom-dropdown { position: relative; }
+        .drop-content {
+            display: none; position: absolute; top: 100%; right: 0; background: #1c1c1e;
+            min-width: 140px; border: 1px solid #444; border-radius: 8px; margin-top: 8px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8); z-index: 1100;
+        }
+        .drop-content label {
+            display: flex; align-items: center; gap: 10px; padding: 12px;
+            cursor: pointer; font-size: 14px; border-bottom: 1px solid #2c2c2e; color: #fff;
+        }
+        .drop-content label:last-child { border-bottom: none; }
+        .show { display: block; }
+
+        #gallery { width: 100%; display: flex; align-items: flex-start; }
+        .v-column { flex: 1; display: flex; flex-direction: column; }
         
-        input[type="text"], select, button {
-            background: #222; border: 1px solid var(--border); color: #fff;
-            padding: 10px; border-radius: 6px; font-size: 16px; outline: none;
+        .media-item { 
+            width: 100%; height: auto; display: block; 
+            transition: filter 0.2s ease;
+            cursor: pointer;
         }
-        .search-box { display: flex; gap: 5px; width: 100%; }
-        .search-box input { flex-grow: 1; }
 
-        #gallery { width: 100%; display: flex; align-items: flex-start; gap: 0; padding: 0; }
-        .v-column { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 0; }
-        .post-container { line-height: 0; background: #000; position: relative; }
-        img, video { width: 100%; height: auto; display: block; border: none; }
-
-        #autocomplete-list {
-            position: absolute; top: 100%; left: 0; right: 0;
-            background: #222; z-index: 1001; max-height: 200px; overflow-y: auto;
-            border: 1px solid var(--border);
+        /* Reverted Hover: Slightly Darken */
+        @media (hover: hover) {
+            .media-item:hover { filter: brightness(0.7); }
         }
-        .autocomplete-item { padding: 12px; border-bottom: 1px solid #333; font-size: 14px; }
-        .val-label { min-width: 45px; font-weight: bold; font-family: monospace; }
+
+        .menu-toggle { display: none; }
+
+        @media (max-width: 1150px) {
+            .logo { display: none; }
+            .header-right { display: none; }
+            .menu-toggle { 
+                display: block; background: #333; border: none; color: #fff; 
+                padding: 0 12px; border-radius: 6px; height: 38px; font-weight: bold;
+            }
+            .header-container { gap: 8px; }
+
+            #header-right-area.open {
+                display: flex; position: absolute; top: 60px; left: 0; right: 0;
+                background: #000; flex-direction: column; padding: 15px; 
+                gap: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+                border-bottom: 1px solid var(--accent);
+            }
+            #header-right-area.open .control-row { width: 100%; flex-direction: column; }
+            #header-right-area.open .slider-box, 
+            #header-right-area.open .drop-btn,
+            #header-right-area.open .custom-dropdown { 
+                width: 100%; height: 44px; 
+            }
+            #header-right-area.open input[type="range"] { width: 50%; }
+        }
 
         #modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;
-            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.95); z-index: 2000; align-items: center; justify-content: center;
         }
-        #action-sheet {
-            background: #1c1c1e; width: 85%; max-width: 320px; border-radius: 14px;
-            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
-            border: 1px solid #333; animation: popIn 0.15s ease-out;
-        }
-        @keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        
-        .sheet-header { padding: 16px; background: #2c2c2e; text-align: center; font-weight: 600; border-bottom: 1px solid #3a3a3c; color: #fff; font-size: 14px; opacity: 0.8; }
+        #action-sheet { background: #1c1c1e; width: 90%; max-width: 320px; border-radius: 14px; overflow: hidden; }
         .sheet-btn {
             display: block; width: 100%; padding: 16px; background: transparent; border: none;
-            border-bottom: 1px solid #2c2c2e; color: #fff; font-size: 17px; text-align: center; cursor: pointer;
+            border-bottom: 1px solid #2c2c2e; color: #fff; font-size: 17px; text-align: center;
         }
-        .sheet-btn:active { background: #3a3a3c; }
-        .sheet-cancel { font-weight: 600; color: #ff453a; border-bottom: none; margin-top: 8px; border-top: 8px solid #000; }
-        .pool-text { color: var(--accent); }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="header-top">
-            <div style="font-weight: bold; letter-spacing: 1px;" onclick="window.scrollTo(0,0)">ZODIAC</div>
-            <button class="menu-toggle" onclick="toggleMenu()">Filters</button>
-        </div>
-        
-        <div id="controls-wrapper">
-            <div class="control-group">
-                <div class="search-container">
-                    <div class="search-box">
-                        <input type="text" id="searchBar" placeholder="Search tags..." autocomplete="off">
-                        <button id="searchBtn">Go</button>
+        <div class="header-container">
+            <div class="logo" onclick="location.reload()">GRID</div>
+            <div class="search-outer">
+                <input type="text" id="searchBar" placeholder="Search tags..." autocomplete="off">
+                <button id="searchBtn">GO</button>
+            </div>
+            <button class="menu-toggle" onclick="document.getElementById('header-right-area').classList.toggle('open')">FILTERS</button>
+            <div id="header-right-area" class="header-right">
+                <div class="control-row">
+                    <select id="ratingSelect" class="drop-btn">
+                        <option value="">Any Rating</option>
+                        <option value="rating:s">Safe</option>
+                        <option value="rating:q">Questionable</option>
+                        <option value="rating:e">Explicit</option>
+                    </select>
+                    <select id="sortSelect" class="drop-btn">
+                        <option value="order:id_desc">Newest</option>
+                        <option value="order:id_asc">Oldest</option>
+                        <option value="order:score">Top Score</option>
+                        <option value="order:favcount">Favorites</option>
+                        <option value="order:random">Random</option>
+                        <option value="order:pool">Pool Order</option>
+                    </select>
+                </div>
+                <div class="control-row">
+                    <div class="custom-dropdown">
+                        <div class="drop-btn" onclick="toggleDrop()">Type: <span id="typeStatus" style="margin-left:5px; color:var(--accent)">All</span></div>
+                        <div id="typeMenu" class="drop-content">
+                            <label><input type="checkbox" class="type-chk" value="-type:webm -type:gif" checked data-label="Static"> Static</label>
+                            <label><input type="checkbox" class="type-chk" value="type:gif" checked data-label="GIF"> GIF</label>
+                            <label><input type="checkbox" class="type-chk" value="type:webm" checked data-label="Video"> Video</label>
+                        </div>
                     </div>
-                    <div id="autocomplete-list"></div>
-                </div>
-            </div>
-
-            <div class="control-row">
-                <select id="ratingSelect" style="flex:1">
-                    <option value="">Any Rating</option>
-                    <option value="rating:s">Safe</option>
-                    <option value="rating:q">Questionable</option>
-                    <option value="rating:e">Explicit</option>
-                </select>
-                <select id="sortSelect" style="flex:1">
-                    <option value="order:id_desc">Newest</option>
-                    <option value="order:score">Top Score</option>
-                    <option value="order:favcount">Favorites</option>
-                    <option value="order:random">Random</option>
-                    <option value="order:updated">Updated</option>
-                    <option value="order:id_asc">Oldest</option>
-                </select>
-            </div>
-
-            <div class="control-group" style="margin-top:15px;">
-                <div class="control-row">
-                    <span>Score:</span>
-                    <input type="range" id="scoreSlider" min="0" max="100" step="1" value="0">
-                    <span id="scoreVal" class="val-label">0+</span>
+                    <select id="resSelect" class="drop-btn">
+                        <option value="preview">Thumb</option>
+                        <option value="sample" selected>Scaled</option>
+                        <option value="file">Full</option>
+                    </select>
                 </div>
                 <div class="control-row">
-                    <span>Cols:</span>
-                    <input type="range" id="sizeSlider" min="1" max="6" step="1" value="2">
-                    <span id="sizeVal" class="val-label">2</span>
+                    <div class="slider-box">
+                        <span>Score</span>
+                        <input type="range" id="scoreSlider" min="0" max="100" value="0">
+                        <b id="scoreVal">0</b>
+                    </div>
+                    <div class="slider-box">
+                        <span>Cols</span>
+                        <input type="range" id="sizeSlider" min="1" max="12" value="6">
+                        <b id="sizeVal">6</b>
+                    </div>
                 </div>
             </div>
-
-            <div class="control-row">
-                <select id="typeSelect" style="flex:1">
-                    <option value="">All Types</option>
-                    <option value="-type:webm">Static</option>
-                    <option value="type:webm">Video</option>
-                </select>
-                <select id="resSelect" style="flex:1">
-                    <option value="preview">Thumb</option>
-                    <option value="sample" selected>Scaled</option>
-                    <option value="file">Full</option>
-                </select>
-            </div>
-            <button onclick="toggleMenu()" style="width: 100%; margin-top: 15px; background: #444;">Apply & Close</button>
         </div>
     </header>
 
     <div id="gallery"></div>
-    <div id="status" style="text-align:center; padding: 20px; color: #666; font-size: 14px;"></div>
-    <div id="sentinel" style="height: 50px;"></div>
+    <div id="sentinel" style="height: 100px;"></div>
 
-    <div id="modal-overlay" onclick="closeModal(event)">
-        <div id="action-sheet">
-            <div class="sheet-header">Post Options</div>
+    <div id="modal-overlay" onclick="this.style.display='none'">
+        <div id="action-sheet" onclick="event.stopPropagation()">
             <div id="sheet-actions"></div>
-            <button class="sheet-btn sheet-cancel" onclick="closeModal(null)">Cancel</button>
+            <button class="sheet-btn" style="color:#ff453a; font-weight:bold" onclick="document.getElementById('modal-overlay').style.display='none'">Cancel</button>
         </div>
     </div>
 
     <script>
-        let currentPage = 1;
-        let isFetching = false;
-        let hasMore = true;
-        let currentPosts = [];
-        let postCounter = 0;
+        let currentPage = 1, isFetching = false, hasMore = true, currentPosts = [], postCounter = 0;
+        const gallery = document.getElementById('gallery'), searchInput = document.getElementById('searchBar');
+        const scoreSlider = document.getElementById('scoreSlider'), sizeSlider = document.getElementById('sizeSlider');
 
-        const gallery = document.getElementById('gallery');
-        const searchInput = document.getElementById('searchBar');
-        const scoreSlider = document.getElementById('scoreSlider');
-        const sizeSlider = document.getElementById('sizeSlider');
-        const wrapper = document.getElementById('controls-wrapper');
-        const modalOverlay = document.getElementById('modal-overlay');
-        const sheetActions = document.getElementById('sheet-actions');
+        function toggleDrop() { document.getElementById("typeMenu").classList.toggle("show"); }
+        window.onclick = (e) => { if (!e.target.closest('.custom-dropdown')) { document.getElementById("typeMenu").classList.remove("show"); }};
 
-        function toggleMenu() { wrapper.classList.toggle('open'); }
-        function closeModal(e) { 
-            if(!e || e.target === modalOverlay || e.target.classList.contains('sheet-cancel')) {
-                modalOverlay.style.display = 'none'; 
-            }
+        function setDeviceDefaults() {
+            const isMobile = window.innerWidth <= 1024;
+            const isPool = searchInput.value.includes('pool:');
+            let defaultCols = isMobile ? (isPool ? 1 : 2) : (isPool ? 2 : 6);
+            sizeSlider.value = defaultCols;
+            document.getElementById('sizeVal').innerText = defaultCols;
         }
 
-        function checkUrlParams() {
-            const params = new URLSearchParams(window.location.search);
-            if (params.has('tags')) searchInput.value = params.get('tags');
+        function updateTypeLabel() {
+            const chks = document.querySelectorAll('.type-chk:checked');
+            const label = document.getElementById('typeStatus');
+            if (chks.length === 3) label.innerText = "All";
+            else if (chks.length === 0) label.innerText = "None";
+            else label.innerText = Array.from(chks).map(c => c.dataset.label).join(',');
+            loadPosts(true);
         }
 
         function getMappedScore(val) {
@@ -180,8 +239,8 @@
 
         function setupColumns() {
             gallery.innerHTML = '';
-            const colsCount = parseInt(sizeSlider.value);
-            for (let i = 0; i < colsCount; i++) {
+            const count = parseInt(sizeSlider.value);
+            for (let i = 0; i < count; i++) {
                 const col = document.createElement('div');
                 col.className = 'v-column';
                 gallery.appendChild(col);
@@ -191,118 +250,85 @@
         async function loadPosts(reset = false) {
             if (isFetching || (!hasMore && !reset)) return;
             isFetching = true;
-            document.getElementById('status').innerText = "Loading...";
-            
-            if (reset) {
-                currentPage = 1;
-                currentPosts = [];
-                postCounter = 0;
-                hasMore = true;
-                setupColumns();
-                const newUrl = window.location.pathname + '?tags=' + encodeURIComponent(searchInput.value);
-                window.history.replaceState(null, '', newUrl);
-            }
-
+            if (reset) { currentPage = 1; postCounter = 0; hasMore = true; setupColumns(); currentPosts = []; }
             const score = getMappedScore(scoreSlider.value);
-            const tags = `${searchInput.value} ${document.getElementById('ratingSelect').value} ${document.getElementById('sortSelect').value} ${score > 0 ? 'score:>=' + score : ''} ${document.getElementById('typeSelect').value}`.trim();
+            const typeFilters = Array.from(document.querySelectorAll('.type-chk:checked')).map(c => c.value);
+            const typeStr = (typeFilters.length === 3 || typeFilters.length === 0) ? "" : `(${typeFilters.join('~')})`;
+            const tags = `${searchInput.value} ${document.getElementById('ratingSelect').value} ${document.getElementById('sortSelect').value} ${score > 0 ? 'score:>=' + score : ''} ${typeStr}`.trim();
             const url = `https://e621.net/posts.json?tags=${encodeURIComponent(tags)}&page=${currentPage}&limit=40`;
-
             try {
-                const response = await fetch(url, { headers: { 'User-Agent': 'ZodiacMobile/1.0' } });
-                const data = await response.json();
-                
-                if (!data.posts || data.posts.length === 0) {
-                    hasMore = false;
-                    document.getElementById('status').innerText = "End of results.";
-                } else {
-                    currentPosts = reset ? data.posts : [...currentPosts, ...data.posts];
+                const resp = await fetch(url, { headers: { 'User-Agent': 'Grid/5.6' } });
+                const data = await resp.json();
+                if (!data.posts || !data.posts.length) hasMore = false;
+                else {
+                    if (reset) currentPosts = data.posts; else currentPosts.push(...data.posts);
                     renderPosts(data.posts);
                     currentPage++;
-                    document.getElementById('status').innerText = "";
                 }
-            } catch (err) {
-                document.getElementById('status').innerText = "Fetch error.";
             } finally { isFetching = false; }
         }
 
         function renderPosts(posts) {
+            const cols = document.getElementsByClassName('v-column');
             const resType = document.getElementById('resSelect').value;
-            const cols = gallery.getElementsByClassName('v-column');
-            if (cols.length === 0) return;
-
             posts.forEach(post => {
                 if (!post.file || !post.file.url) return;
-                const div = document.createElement('div');
-                div.className = 'post-container';
                 const container = document.createElement('div');
-                container.style.cursor = "pointer";
-                container.onclick = (e) => { e.preventDefault(); openOptions(post); };
-
-                const colIndex = postCounter % cols.length;
-                cols[colIndex].appendChild(div);
-                div.appendChild(container);
+                const colIdx = postCounter % cols.length;
+                if(cols[colIdx]) cols[colIdx].appendChild(container);
                 postCounter++;
 
                 let media;
                 const isVideo = post.file.ext === 'webm';
+
                 if (resType === 'preview') {
                     media = document.createElement('img');
                     media.src = post.preview.url;
-                } else if (isVideo) {
+                } 
+                else if (isVideo) {
                     media = document.createElement('video');
                     media.src = post.file.url;
-                    media.autoplay = true; media.loop = true; media.muted = true; media.playsInline = true;
-                } else {
+                    media.autoplay = true;
+                    media.loop = true;
+                    media.muted = true;
+                    media.playsInline = true;
+                } 
+                else {
                     media = document.createElement('img');
-                    media.src = (resType === 'sample' && post.sample.has) ? post.sample.url : post.file.url;
+                    media.src = (resType === 'sample' && post.sample && post.sample.has) ? post.sample.url : post.file.url;
                 }
+
+                media.className = "media-item";
                 media.loading = "lazy";
+
+                const handleOp = (e) => {
+                    if (e.button === 1 || e.ctrlKey) { window.open(post.file.url, '_blank'); }
+                    else if (e.altKey) { window.open(`https://e621.net/posts/${post.id}`, '_blank'); }
+                    else if (e.button === 0) { openSheet(post); }
+                };
+                media.onclick = handleOp;
+                media.onauxclick = handleOp;
                 container.appendChild(media);
             });
         }
 
-        function openOptions(post) {
-            sheetActions.innerHTML = '';
-            const btnImg = document.createElement('button');
-            btnImg.className = 'sheet-btn'; btnImg.innerText = 'Open Image';
-            btnImg.onclick = () => { window.open(post.file.url, '_blank'); closeModal(); };
-            sheetActions.appendChild(btnImg);
-
-            const btnPage = document.createElement('button');
-            btnPage.className = 'sheet-btn'; btnPage.innerText = 'Open Post Page';
-            btnPage.onclick = () => { window.open(`https://e621.net/posts/${post.id}`, '_blank'); closeModal(); };
-            sheetActions.appendChild(btnPage);
-
-            if (post.pools && post.pools.length > 0) {
-                post.pools.forEach(poolId => {
-                    const btnPool = document.createElement('button');
-                    btnPool.className = 'sheet-btn pool-text';
-                    btnPool.innerText = `Open Pool #${poolId}`;
-                    btnPool.onclick = () => {
-                        const currentUrl = window.location.href.split('?')[0];
-                        window.open(`${currentUrl}?tags=pool:${poolId}`, '_blank');
-                        closeModal();
-                    };
-                    sheetActions.appendChild(btnPool);
-                });
-            }
-            modalOverlay.style.display = 'flex';
+        function openSheet(post) {
+            const actions = document.getElementById('sheet-actions');
+            actions.innerHTML = `<button class="sheet-btn" onclick="window.open('${post.file.url}')">Open Full Image</button>
+                                 <button class="sheet-btn" onclick="window.open('https://e621.net/posts/${post.id}')">View Post Page</button>`;
+            document.getElementById('modal-overlay').style.display = 'flex';
         }
 
-        sizeSlider.addEventListener('input', () => { document.getElementById('sizeVal').innerText = sizeSlider.value; });
-        sizeSlider.addEventListener('change', () => { postCounter = 0; setupColumns(); renderPosts(currentPosts); });
-        scoreSlider.addEventListener('input', () => { document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value) + "+"; });
-        
-        document.getElementById('searchBtn').onclick = () => { loadPosts(true); toggleMenu(); };
-        [scoreSlider, document.getElementById('ratingSelect'), document.getElementById('sortSelect'), document.getElementById('typeSelect'), document.getElementById('resSelect')].forEach(el => {
-            el.addEventListener('change', () => loadPosts(true));
-        });
+        sizeSlider.oninput = () => document.getElementById('sizeVal').innerText = sizeSlider.value;
+        sizeSlider.onchange = () => loadPosts(true);
+        scoreSlider.oninput = () => document.getElementById('scoreVal').innerText = getMappedScore(scoreSlider.value);
+        scoreSlider.onchange = () => loadPosts(true);
+        document.querySelectorAll('.type-chk').forEach(c => c.onchange = updateTypeLabel);
+        document.getElementById('searchBtn').onclick = () => { loadPosts(true); document.getElementById('header-right-area').classList.remove('open'); };
+        searchInput.onkeydown = (e) => { if(e.key==='Enter') { loadPosts(true); document.getElementById('header-right-area').classList.remove('open'); } };
+        window.onscroll = () => { if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1500) loadPosts(); };
 
-        window.addEventListener('scroll', () => {
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1200) loadPosts();
-        });
-
-        checkUrlParams();
+        setDeviceDefaults();
         setupColumns();
         loadPosts(true);
     </script>
